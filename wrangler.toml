@@ -1,35 +1,4 @@
+# Cloudflare Pages configuration for AuraQuant Frontend
 name = "auraquant-frontend"
-main = "index.html"
 compatibility_date = "2024-12-01"
-
-# Account ID from your Cloudflare account
-account_id = "2e471ad68f4782901db1939103c7c074"
-
-# Routes configuration (update with your domain)
-# route = { pattern = "auraquant.com/*", zone_id = "YOUR_ZONE_ID" }
-
-# Build configuration for static site
-[site]
-bucket = "./"
-include = ["index.html", "css/*", "js/*", "assets/*", "_headers"]
-exclude = ["node_modules", ".git", "*.md", "wrangler.toml", ".wrangler"]
-
-# Environment variables (if needed)
-[vars]
-API_URL = "https://auraquant-backend.onrender.com"
-WS_URL = "wss://auraquant-backend.onrender.com"
-
-# Deployment configuration
-[env.production]
-name = "auraquant-frontend-production"
-route = { pattern = "auraquant.com/*", zone_name = "auraquant.com" }
-
-[env.staging]
-name = "auraquant-frontend-staging"
-workers_dev = true
-
-# Security headers will be handled by _headers file for Pages
-# For Workers, you would configure them here
-
-# Compatibility flags
-compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = "./"
