@@ -169,18 +169,24 @@ class AuraQuantApp {
     }
     
     showDashboard() {
-        document.getElementById('app').innerHTML = `
-            <div class="dashboard">
-                <header>
-                    <h1>AuraQuant Trading Platform</h1>
-                    <button onclick="app.auth.logout()">Logout</button>
-                </header>
-                <main>
-                    <div id="chart">Chart will load here</div>
-                    <div id="trading-panel">Trading panel</div>
-                </main>
-            </div>
-        `;
+        // Use the Cockpit Infinity dashboard
+        if (window.cockpit) {
+            window.cockpit.init();
+        } else {
+            // Fallback to simple dashboard
+            document.getElementById('app').innerHTML = `
+                <div class="dashboard">
+                    <header>
+                        <h1>AuraQuant Trading Platform</h1>
+                        <button onclick="app.auth.logout()">Logout</button>
+                    </header>
+                    <main>
+                        <div id="chart">Loading Cockpit Infinity...</div>
+                        <div id="trading-panel">Initializing systems...</div>
+                    </main>
+                </div>
+            `;
+        }
     }
 }
 
