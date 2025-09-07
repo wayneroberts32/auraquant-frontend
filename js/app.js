@@ -9,15 +9,28 @@ class AuraQuantApp {
     }
     
     async init() {
+        // TEMPORARY: Skip auth and go straight to dashboard
+        // TODO: Re-enable auth once login system is configured
+        this.showDashboard();
+        
+        // Try to connect WebSocket without token for now
+        try {
+            this.ws.connect(null);
+        } catch (error) {
+            console.log('WebSocket connection pending...');
+        }
+        
+        // Hide loading screen
+        document.getElementById('loadingScreen').style.display = 'none';
+        
+        /* Original auth flow - restore later
         if (this.auth.isAuthenticated()) {
             this.showDashboard();
             this.ws.connect(this.auth.token);
         } else {
             this.showLogin();
         }
-        
-        // Hide loading screen
-        document.getElementById('loadingScreen').style.display = 'none';
+        */
     }
     
     showLogin() {
