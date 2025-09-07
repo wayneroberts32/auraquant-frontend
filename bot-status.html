@@ -894,32 +894,75 @@
                     localStorage.removeItem('balance_set_time');
                     localStorage.removeItem('last_known_balance');
                     
-                    // Update display immediately
-                    document.getElementById('current-capital').textContent = '$500.00';
+                    // Update display immediately with custom reset amount
+                    // Update Starting Capital field
+                    const startingCapitalElements = document.querySelectorAll('.metric-value');
+                    if (startingCapitalElements[0]) {
+                        startingCapitalElements[0].textContent = `$${resetAmount.toFixed(2)} AUD`;
+                    }
+                    
+                    // Update Current Capital
+                    document.getElementById('current-capital').textContent = `$${resetAmount.toFixed(2)}`;
+                    
+                    // Reset all metrics
                     document.getElementById('total-trades').textContent = '0';
                     document.getElementById('win-rate').textContent = '0%';
+                    document.getElementById('pnl-today').textContent = '$0.00';
                     document.getElementById('total-pnl').textContent = '$0.00';
+                    document.getElementById('profit-factor').textContent = '0.00';
+                    document.getElementById('sharpe-ratio').textContent = '0.00';
+                    document.getElementById('max-drawdown').textContent = '0%';
+                    document.getElementById('backtests-run').textContent = '0';
                     document.getElementById('evolution-progress').style.width = '1%';
                     document.getElementById('evolution-progress').textContent = 'Evolution: 1';
                     document.getElementById('current-version').textContent = 'V1';
                     
-                    window.botMonitor.capital = 500;
+                    // Update bot monitor with custom amount
+                    window.botMonitor.capital = resetAmount;
                     window.botMonitor.evolution = 1;
                     window.botMonitor.trades = [];
                     
-                    alert(`✅ BOT RESET COMPLETE!\n\nBalance: $500.00\nEvolution: Generation 1\nStatus: Ready to trade`);
+                    // Store the reset amount
+                    localStorage.setItem('forced_balance', resetAmount);
+                    
+                    alert(`✅ BOT RESET COMPLETE!\n\nNew Balance: $${resetAmount.toFixed(2)}\nEvolution: Generation 1\nStatus: Ready to trade`);
                     
                     // Refresh status after 2 seconds
                     setTimeout(() => window.botMonitor.fetchBotStatus(), 2000);
                 } else {
-                    // Fallback: manually set balance to 500
-                    localStorage.setItem('forced_balance', 500);
-                    document.getElementById('current-capital').textContent = '$500.00';
-                    window.botMonitor.capital = 500;
-                    alert(`⚠️ Reset initiated. You can manually set balance to $500 if needed.`);
+                    // Fallback: manually set balance to custom amount
+                    localStorage.setItem('forced_balance', resetAmount);
+                    
+                    // Update Starting Capital
+                    const startingCapitalElements = document.querySelectorAll('.metric-value');
+                    if (startingCapitalElements[0]) {
+                        startingCapitalElements[0].textContent = `$${resetAmount.toFixed(2)} AUD`;
+                    }
+                    
+                    // Update Current Capital
+                    document.getElementById('current-capital').textContent = `$${resetAmount.toFixed(2)}`;
+                    window.botMonitor.capital = resetAmount;
+                    
+                    // Reset other fields
+                    document.getElementById('pnl-today').textContent = '$0.00';
+                    document.getElementById('total-pnl').textContent = '$0.00';
+                    document.getElementById('total-trades').textContent = '0';
+                    
+                    alert(`⚠️ Reset applied locally to $${resetAmount.toFixed(2)}. Will sync with backend.`);
                 }
             } catch (error) {
-                alert(`❌ Reset failed. Use 'Set Balance' to manually set to $500.\nError: ${error.message}`);
+                // Even on error, update the display locally
+                const startingCapitalElements = document.querySelectorAll('.metric-value');
+                if (startingCapitalElements[0]) {
+                    startingCapitalElements[0].textContent = `$${resetAmount.toFixed(2)} AUD`;
+                }
+                document.getElementById('current-capital').textContent = `$${resetAmount.toFixed(2)}`;
+                document.getElementById('pnl-today').textContent = '$0.00';
+                document.getElementById('total-pnl').textContent = '$0.00';
+                window.botMonitor.capital = resetAmount;
+                localStorage.setItem('forced_balance', resetAmount);
+                
+                alert(`❌ Backend reset failed but local reset applied to $${resetAmount.toFixed(2)}.\nError: ${error.message}`);
             }
         });
         
