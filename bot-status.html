@@ -256,7 +256,7 @@
             <h2>💰 Capital Status</h2>
             <div class="metric">
                 <span class="metric-label">Starting Capital:</span>
-                <span class="metric-value">$3,947.83 AUD</span>
+                <span class="metric-value">$0.00 AUD</span>
             </div>
             <div class="metric">
                 <span class="metric-label">Current Capital:</span>
@@ -385,18 +385,44 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="js/balance-manager.js"></script>
     <script>
         // Bot Status Monitor - CONNECTED TO REAL BACKEND
         const API_URL = 'https://auraquant-backend.onrender.com';
         
         class BotStatusMonitor {
             constructor() {
-                this.capital = 3947.83; // Will be updated from backend
+                // Check for saved balance first
+                const savedBalance = localStorage.getItem('forced_balance') || 
+                                   localStorage.getItem('reset_balance') || 
+                                   localStorage.getItem('manual_balance_override');
+                this.capital = savedBalance ? parseFloat(savedBalance) : 0; // Start at 0 if no saved balance
+                this.startingCapital = this.capital; // Track starting capital for P&L
                 this.trades = [];
                 this.evolution = 1;
                 this.startTime = Date.now();
                 this.chart = null;
                 this.init();
+                
+                // Set initial display values
+                this.updateInitialDisplay();
+            }
+            
+            updateInitialDisplay() {
+                // Update starting capital display
+                const startingCapitalElements = document.querySelectorAll('.metric-value');
+                if (startingCapitalElements[0]) {
+                    startingCapitalElements[0].textContent = `$${this.capital.toFixed(2)} AUD`;
+                }
+                
+                // Update current capital
+                document.getElementById('current-capital').textContent = `$${this.capital.toFixed(2)}`;
+                
+                // P&L should be 0 initially
+                document.getElementById('total-pnl').textContent = '$0.00';
+                document.getElementById('total-pnl').className = 'metric-value neutral';
+                document.getElementById('pnl-today').textContent = '$0.00';
+                document.getElementById('pnl-today').className = 'metric-value neutral';
             }
 
             init() {
@@ -436,15 +462,34 @@
 
             async fetchBotStatus() {
                 try {
+                    // Check if we have a forced balance that should override backend
+                    const forcedBalance = localStorage.getItem('forced_balance');
+                    const resetBalance = localStorage.getItem('reset_balance');
+                    const useLocalBalance = forcedBalance || resetBalance;
+                    
                     // Fetch bot status from real backend
                     const response = await fetch(`${API_URL}/api/bot/status`);
                     if (response.ok) {
                         const data = await response.json();
                         
-                        // Update capital from real data
-                        if (data.bot && data.bot.balance !== undefined) {
+                        // If we have a forced/reset balance, use that instead of backend
+                        if (useLocalBalance) {
+                            this.capital = parseFloat(useLocalBalance);
+                            // Override backend value
+                            if (data.bot) {
+                                data.bot.balance = this.capital;
+                            }
+                        } else if (data.bot && data.bot.balance !== undefined) {
                             this.capital = data.bot.balance;
-                            document.getElementById('current-capital').textContent = `$${this.capital.toFixed(2)}`;
+                        }
+                        
+                        // Always update display with our controlled value
+                        document.getElementById('current-capital').textContent = `$${this.capital.toFixed(2)}`;
+                        
+                        // Also update Starting Capital if it exists
+                        const startingCapitalElements = document.querySelectorAll('.metric-value');
+                        if (startingCapitalElements[0] && useLocalBalance) {
+                            startingCapitalElements[0].textContent = `$${this.capital.toFixed(2)} AUD`;
                         }
                         
                         // Update trade count
@@ -459,10 +504,35 @@
                             document.getElementById('win-rate').className = winRate > 50 ? 'metric-value positive' : 'metric-value negative';
                         }
                         
-                        // Update P&L
-                        const pnl = this.capital - 3947.83; // Calculate from starting balance
-                        document.getElementById('total-pnl').textContent = `$${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}`;
-                        document.getElementById('total-pnl').className = pnl >= 0 ? 'metric-value positive' : 'metric-value negative';
+                        // Update P&L - if we just reset, P&L should be 0
+                        if (useLocalBalance) {
+                            // We just reset - P&L is 0
+                            document.getElementById('total-pnl').textContent = '$0.00';
+                            document.getElementById('total-pnl').className = 'metric-value neutral';
+                            document.getElementById('pnl-today').textContent = '$0.00';
+                            document.getElementById('pnl-today').className = 'metric-value neutral';
+                        } else {
+                            // Get starting capital from the display or use stored starting capital
+                            const startingCapitalText = document.querySelector('.metric-value').textContent;
+                            const startingCapital = parseFloat(startingCapitalText.replace(/[$,AUD ]/g, ''));
+                            
+                            // Only calculate P&L if we have valid starting capital
+                            if (!isNaN(startingCapital) && startingCapital > 0) {
+                                const pnl = this.capital - startingCapital;
+                                // Only show P&L if there's actually a difference
+                                if (Math.abs(pnl) > 0.01) {
+                                    document.getElementById('total-pnl').textContent = `$${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}`;
+                                    document.getElementById('total-pnl').className = pnl >= 0 ? 'metric-value positive' : 'metric-value negative';
+                                } else {
+                                    document.getElementById('total-pnl').textContent = '$0.00';
+                                    document.getElementById('total-pnl').className = 'metric-value neutral';
+                                }
+                            } else {
+                                // No valid starting capital, show 0 P&L
+                                document.getElementById('total-pnl').textContent = '$0.00';
+                                document.getElementById('total-pnl').className = 'metric-value neutral';
+                            }
+                        }
                         
                     // Update chart
                     this.updateChart();
@@ -672,6 +742,84 @@
         // Initialize bot monitor with real backend connection
         window.botMonitor = new BotStatusMonitor();
         
+        // Add live-update hooks for real-time balance updates without page refresh
+        // Listen for storage events from other tabs/windows
+        window.addEventListener('storage', function(e) {
+            if (e.key === 'forced_balance' || e.key === 'reset_balance' || e.key === 'manual_balance_override') {
+                const newBalance = parseFloat(e.newValue);
+                if (!isNaN(newBalance)) {
+                    // Update all balance displays immediately
+                    window.botMonitor.capital = newBalance;
+                    document.getElementById('current-capital').textContent = `$${newBalance.toFixed(2)}`;
+                    
+                    // Update starting capital
+                    const startingCapitalElements = document.querySelectorAll('.metric-value');
+                    if (startingCapitalElements[0]) {
+                        startingCapitalElements[0].textContent = `$${newBalance.toFixed(2)} AUD`;
+                    }
+                    
+                    // Reset P&L to 0 since balance was just set
+                    document.getElementById('total-pnl').textContent = '$0.00';
+                    document.getElementById('total-pnl').className = 'metric-value neutral';
+                    document.getElementById('pnl-today').textContent = '$0.00';
+                    document.getElementById('pnl-today').className = 'metric-value neutral';
+                    
+                    // Update chart if exists
+                    if (window.botMonitor.chart) {
+                        window.botMonitor.updateChart();
+                    }
+                    
+                    console.log('✅ Balance updated from another tab:', newBalance);
+                }
+            }
+        });
+        
+        // Listen for custom balance update events (same tab)
+        window.addEventListener('balanceUpdate', function(e) {
+            const newBalance = e.detail.balance;
+            if (!isNaN(newBalance)) {
+                // Update all balance displays immediately
+                window.botMonitor.capital = newBalance;
+                document.getElementById('current-capital').textContent = `$${newBalance.toFixed(2)}`;
+                
+                // Update starting capital
+                const startingCapitalElements = document.querySelectorAll('.metric-value');
+                if (startingCapitalElements[0]) {
+                    startingCapitalElements[0].textContent = `$${newBalance.toFixed(2)} AUD`;
+                }
+                
+                // Reset P&L to 0 since balance was just set
+                document.getElementById('total-pnl').textContent = '$0.00';
+                document.getElementById('total-pnl').className = 'metric-value neutral';
+                document.getElementById('pnl-today').textContent = '$0.00';
+                document.getElementById('pnl-today').className = 'metric-value neutral';
+                
+                // Update chart if exists
+                if (window.botMonitor.chart) {
+                    window.botMonitor.updateChart();
+                }
+                
+                console.log('✅ Balance updated via custom event:', newBalance);
+            }
+        });
+        
+        // Override the existing localStorage.setItem to trigger immediate updates
+        const originalSetItem = localStorage.setItem;
+        localStorage.setItem = function(key, value) {
+            originalSetItem.apply(this, arguments);
+            
+            // Trigger immediate update for balance changes
+            if ((key === 'forced_balance' || key === 'reset_balance' || key === 'manual_balance_override') && window.botMonitor) {
+                const newBalance = parseFloat(value);
+                if (!isNaN(newBalance)) {
+                    // Dispatch custom event for immediate update
+                    window.dispatchEvent(new CustomEvent('balanceUpdate', { 
+                        detail: { balance: newBalance, source: key }
+                    }));
+                }
+            }
+        };
+        
         // Add refresh button functionality
         document.getElementById('refresh-btn').addEventListener('click', function() {
             console.log('Refresh button clicked');
@@ -820,6 +968,36 @@
             }
         });
         
+        // Function to immediately update all balance displays
+        function forceUpdateAllBalances(amount) {
+            // Update Starting Capital
+            const startingCapitalElements = document.querySelectorAll('.metric-value');
+            if (startingCapitalElements[0]) {
+                startingCapitalElements[0].textContent = `$${amount.toFixed(2)} AUD`;
+            }
+            
+            // Update Current Capital
+            document.getElementById('current-capital').textContent = `$${amount.toFixed(2)}`;
+            
+            // Reset P&L to zero
+            document.getElementById('pnl-today').textContent = '$0.00';
+            document.getElementById('pnl-today').className = 'metric-value neutral';
+            document.getElementById('total-pnl').textContent = '$0.00';
+            document.getElementById('total-pnl').className = 'metric-value neutral';
+            
+            // Update bot monitor
+            if (window.botMonitor) {
+                window.botMonitor.capital = amount;
+            }
+            
+            // Store in all possible places
+            localStorage.setItem('forced_balance', amount);
+            localStorage.setItem('reset_balance', amount);
+            localStorage.setItem('last_known_balance', amount);
+            localStorage.setItem('manual_balance_override', amount);
+            localStorage.setItem('balance_timestamp', new Date().toISOString());
+        }
+        
         // Add reset button functionality
         document.getElementById('reset-bot-btn').addEventListener('click', async function() {
             // First confirmation
@@ -922,8 +1100,29 @@
                     window.botMonitor.evolution = 1;
                     window.botMonitor.trades = [];
                     
-                    // Store the reset amount
+                    // Store the reset amount and clear old P&L data
                     localStorage.setItem('forced_balance', resetAmount);
+                    localStorage.setItem('reset_balance', resetAmount);
+                    localStorage.setItem('balance_timestamp', new Date().toISOString());
+                    
+                    // Force immediate P&L reset - MUST happen immediately
+                    document.getElementById('total-pnl').textContent = '$0.00';
+                    document.getElementById('total-pnl').className = 'metric-value neutral';
+                    document.getElementById('pnl-today').textContent = '$0.00';
+                    document.getElementById('pnl-today').className = 'metric-value neutral';
+                    
+                    // Trigger immediate update event
+                    window.dispatchEvent(new CustomEvent('balanceUpdate', { 
+                        detail: { balance: resetAmount, source: 'reset' }
+                    }));
+                    
+                    // Force one more update to ensure everything is synced
+                    setTimeout(() => {
+                        document.getElementById('total-pnl').textContent = '$0.00';
+                        document.getElementById('total-pnl').className = 'metric-value neutral';
+                        document.getElementById('pnl-today').textContent = '$0.00';
+                        document.getElementById('pnl-today').className = 'metric-value neutral';
+                    }, 100);
                     
                     alert(`✅ BOT RESET COMPLETE!\n\nNew Balance: $${resetAmount.toFixed(2)}\nEvolution: Generation 1\nStatus: Ready to trade`);
                     
@@ -932,6 +1131,8 @@
                 } else {
                     // Fallback: manually set balance to custom amount
                     localStorage.setItem('forced_balance', resetAmount);
+                    localStorage.setItem('reset_balance', resetAmount);
+                    localStorage.setItem('balance_timestamp', new Date().toISOString());
                     
                     // Update Starting Capital
                     const startingCapitalElements = document.querySelectorAll('.metric-value');
@@ -943,10 +1144,17 @@
                     document.getElementById('current-capital').textContent = `$${resetAmount.toFixed(2)}`;
                     window.botMonitor.capital = resetAmount;
                     
-                    // Reset other fields
+                    // Reset other fields - FORCE IMMEDIATE UPDATE
                     document.getElementById('pnl-today').textContent = '$0.00';
+                    document.getElementById('pnl-today').className = 'metric-value neutral';
                     document.getElementById('total-pnl').textContent = '$0.00';
+                    document.getElementById('total-pnl').className = 'metric-value neutral';
                     document.getElementById('total-trades').textContent = '0';
+                    
+                    // Trigger immediate update event
+                    window.dispatchEvent(new CustomEvent('balanceUpdate', { 
+                        detail: { balance: resetAmount, source: 'reset_fallback' }
+                    }));
                     
                     alert(`⚠️ Reset applied locally to $${resetAmount.toFixed(2)}. Will sync with backend.`);
                 }
