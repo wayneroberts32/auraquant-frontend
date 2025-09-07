@@ -107,26 +107,55 @@ class MasterInfinityEngine {
     }
 
     async initialize() {
-        console.log('🚀 MASTER INFINITY ENGINE INITIALIZING...');
-        console.log('💰 Starting Capital: $500 AUD');
-        console.log('🎯 Target: $1,000,000 → ∞');
+        console.log('🚀 MASTER INFINITY ENGINE - DISPLAY MODE');
+        console.log('📡 Connecting to backend for real data...');
         
-        // Load all market symbols
-        await this.loadAllSymbols();
+        // IMPORTANT: Frontend should ONLY display backend data
+        // It should NOT run its own trading simulation!
         
-        // Connect to all data feeds
-        await this.connectDataFeeds();
+        // Connect to backend API
+        await this.connectToBackend();
         
-        // Start the engines
-        this.startTradingEngine();
-        this.startScanningEngine();
-        this.startDecisionEngine();
-        this.startRiskEngine();
-        this.startLearningEngine();
+        // Start fetching real data from backend
+        this.startBackendSync();
         
-        // Activate
-        this.state.active = true;
-        console.log('✅ MASTER INFINITY ENGINE ACTIVE');
+        // Display mode only - no trading engines
+        console.log('✅ DISPLAY MODE ACTIVE - Showing backend data only');
+    }
+    
+    async connectToBackend() {
+        try {
+            const response = await fetch('https://auraquant-backend.onrender.com/api/bot/status');
+            const data = await response.json();
+            
+            // Update state with REAL backend data
+            this.state.capital.current = data.bot.balance;
+            this.state.performance.totalTrades = data.bot.totalTrades;
+            this.state.performance.winRate = data.bot.winRate;
+            
+            console.log(`💰 Backend Balance: $${data.bot.balance}`);
+            console.log(`📊 Backend Trades: ${data.bot.totalTrades}`);
+        } catch (error) {
+            console.error('Failed to connect to backend:', error);
+        }
+    }
+    
+    startBackendSync() {
+        // Fetch backend data every 5 seconds
+        setInterval(async () => {
+            await this.connectToBackend();
+            this.updateDisplay();
+        }, 5000);
+    }
+    
+    updateDisplay() {
+        // Update UI with backend data
+        if (document.getElementById('botBalance')) {
+            document.getElementById('botBalance').textContent = `$${this.state.capital.current.toFixed(2)}`;
+        }
+        if (document.getElementById('totalTrades')) {
+            document.getElementById('totalTrades').textContent = this.state.performance.totalTrades;
+        }
     }
 
     async loadAllSymbols() {
@@ -458,12 +487,9 @@ class MasterInfinityEngine {
     }
 
     startTradingEngine() {
-        // Main trading loop
-        setInterval(() => {
-            if (this.state.active) {
-                this.executeTradingCycle();
-            }
-        }, 1000); // Every second
+        // DISABLED - Frontend should NOT trade!
+        console.log('⚠️ Trading engine disabled - Frontend is display only');
+        return;
     }
 
     async executeTradingCycle() {
@@ -711,10 +737,9 @@ class MasterInfinityEngine {
     }
 
     startDecisionEngine() {
-        // Autonomous decision making
-        setInterval(() => {
-            this.makeDecisions();
-        }, 100); // Every 100ms for ultra-fast decisions
+        // DISABLED - Frontend should NOT make trading decisions!
+        console.log('⚠️ Decision engine disabled - Frontend is display only');
+        return;
     }
 
     makeDecisions() {
