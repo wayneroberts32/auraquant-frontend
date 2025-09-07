@@ -9,17 +9,27 @@ class AuraQuantApp {
     }
     
     async init() {
+        // Hide loading screen immediately after a short delay
+        setTimeout(() => {
+            const loadingScreen = document.getElementById('loadingScreen');
+            if (loadingScreen) {
+                loadingScreen.style.display = 'none';
+            }
+        }, 2000); // 2 second max loading time
+        
         try {
             // TEMPORARY: Skip auth and go straight to dashboard
             // TODO: Re-enable auth once login system is configured
             this.showDashboard();
             
-            // Try to connect WebSocket without token for now
-            try {
-                this.ws.connect(null);
-            } catch (error) {
-                console.log('WebSocket connection pending...');
-            }
+            // Try to connect WebSocket without token for now - don't wait for it
+            setTimeout(() => {
+                try {
+                    this.ws.connect(null);
+                } catch (error) {
+                    console.log('WebSocket connection pending...');
+                }
+            }, 100);
         } catch (error) {
             console.error('Dashboard initialization error:', error);
             // Show basic status even if dashboard fails
@@ -33,9 +43,6 @@ class AuraQuantApp {
             `;
             // Fetch and display bot status
             this.fetchBotStatus();
-        } finally {
-            // Always hide loading screen
-            document.getElementById('loadingScreen').style.display = 'none';
         }
         
         /* Original auth flow - restore later
