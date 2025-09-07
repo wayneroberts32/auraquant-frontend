@@ -9,19 +9,34 @@ class AuraQuantApp {
     }
     
     async init() {
-        // TEMPORARY: Skip auth and go straight to dashboard
-        // TODO: Re-enable auth once login system is configured
-        this.showDashboard();
-        
-        // Try to connect WebSocket without token for now
         try {
-            this.ws.connect(null);
+            // TEMPORARY: Skip auth and go straight to dashboard
+            // TODO: Re-enable auth once login system is configured
+            this.showDashboard();
+            
+            // Try to connect WebSocket without token for now
+            try {
+                this.ws.connect(null);
+            } catch (error) {
+                console.log('WebSocket connection pending...');
+            }
         } catch (error) {
-            console.log('WebSocket connection pending...');
+            console.error('Dashboard initialization error:', error);
+            // Show basic status even if dashboard fails
+            document.getElementById('app').innerHTML = `
+                <div style="padding: 20px; color: white;">
+                    <h1>AuraQuant Status</h1>
+                    <p>Backend: <a href="https://auraquant-backend.onrender.com/api/health" target="_blank">Check Health</a></p>
+                    <p>Bot Status: <a href="https://auraquant-backend.onrender.com/api/bot/status" target="_blank">Check Bot</a></p>
+                    <div id="botStatus">Loading bot status...</div>
+                </div>
+            `;
+            // Fetch and display bot status
+            this.fetchBotStatus();
+        } finally {
+            // Always hide loading screen
+            document.getElementById('loadingScreen').style.display = 'none';
         }
-        
-        // Hide loading screen
-        document.getElementById('loadingScreen').style.display = 'none';
         
         /* Original auth flow - restore later
         if (this.auth.isAuthenticated()) {
@@ -182,23 +197,55 @@ class AuraQuantApp {
     }
     
     showDashboard() {
-        // Use the Cockpit Infinity dashboard
-        if (window.cockpit) {
-            window.cockpit.init();
-        } else {
-            // Fallback to simple dashboard
-            document.getElementById('app').innerHTML = `
-                <div class="dashboard">
-                    <header>
-                        <h1>AuraQuant Trading Platform</h1>
-                        <button onclick="app.auth.logout()">Logout</button>
-                    </header>
-                    <main>
-                        <div id="chart">Loading Cockpit Infinity...</div>
-                        <div id="trading-panel">Initializing systems...</div>
-                    </main>
+        try {
+            // Use the Cockpit Infinity dashboard
+            if (window.cockpit) {
+                window.cockpit.init();
+            } else {
+                // Fallback to simple dashboard
+                document.getElementById('app').innerHTML = `
+                    <div class="dashboard">
+                        <header>
+                            <h1>AuraQuant Trading Platform</h1>
+                        </header>
+                        <main>
+                            <div id="botStatusDisplay" style="padding: 20px; background: rgba(0,0,0,0.5); border-radius: 10px; margin: 20px;">
+                                <h2 style="color: #00ff88;">Bot Status</h2>
+                                <div id="statusContent">Loading...</div>
+                            </div>
+                        </main>
+                    </div>
+                `;
+                this.fetchBotStatus();
+            }
+        } catch (error) {
+            console.error('Dashboard error:', error);
+            this.fetchBotStatus();
+        }
+    }
+    
+    async fetchBotStatus() {
+        try {
+            const response = await fetch('https://auraquant-backend.onrender.com/api/bot/status');
+            const data = await response.json();
+            
+            const statusHTML = `
+                <div style="color: white; font-family: monospace;">
+                    <p>✅ Backend: ${data.status}</p>
+                    <p>💰 Balance: $${data.bot.balance}</p>
+                    <p>📊 Total Trades: ${data.bot.totalTrades}</p>
+                    <p>🎯 Win Rate: ${data.bot.winRate}%</p>
+                    <p>📈 Mode: ${data.bot.mode}</p>
+                    <p>🤖 Trading: ${data.bot.trading ? 'Active' : 'Inactive'}</p>
                 </div>
             `;
+            
+            const container = document.getElementById('statusContent') || document.getElementById('botStatus');
+            if (container) {
+                container.innerHTML = statusHTML;
+            }
+        } catch (error) {
+            console.error('Failed to fetch bot status:', error);
         }
     }
 }
