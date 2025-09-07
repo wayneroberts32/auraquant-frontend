@@ -251,6 +251,7 @@ class IntegratedDashboard {
             <div class="dashboard-header">
                 <div class="dashboard-title">AuraQuant Live Status</div>
                 <div class="dashboard-controls">
+                    <button class="control-btn" id="refresh-btn" title="Refresh">🔄</button>
                     <button class="control-btn" id="minimize-btn" title="Minimize">_</button>
                     <button class="control-btn" id="close-btn" title="Close">×</button>
                 </div>
@@ -418,11 +419,28 @@ class IntegratedDashboard {
             });
         });
 
+        // Refresh button
+        const refreshBtn = document.getElementById('refresh-btn');
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', () => {
+                this.fetchBackendStatus();
+                refreshBtn.style.animation = 'spin 1s';
+                setTimeout(() => {
+                    refreshBtn.style.animation = '';
+                }, 1000);
+            });
+        }
+        
         // Minimize button
         document.getElementById('minimize-btn').addEventListener('click', () => {
             this.dashboardElement.classList.toggle('minimized');
         });
 
+        // Refresh button
+        document.getElementById('refresh-btn').addEventListener('click', () => {
+            this.fetchFromBackend();
+        });
+        
         // Close button
         document.getElementById('close-btn').addEventListener('click', () => {
             this.dashboardElement.style.display = 'none';
@@ -435,6 +453,9 @@ class IntegratedDashboard {
     }
 
     startMonitoring() {
+        // Fetch from backend immediately
+        this.fetchFromBackend();
+        
         // Update bot status every second
         setInterval(() => this.updateBotStatus(), 1000);
         
@@ -446,31 +467,54 @@ class IntegratedDashboard {
     }
 
     updateBotStatus() {
-        // Check if we have the master infinity engine
-        if (window.masterInfinity) {
-            const status = window.masterInfinity.getStatus();
-            document.getElementById('live-capital').textContent = `$${status.capital.current.toFixed(2)}`;
-            document.getElementById('live-trades').textContent = status.performance.totalTrades;
+        // Always fetch from backend core API instead of frontend
+        this.fetchBackendStatus();
+    }
+    
+    async fetchBackendStatus() {
+        try {
+            // Connect directly to backend core API - NOT frontend
+            const response = await fetch('https://auraquant-backend.onrender.com/api/bot/status');
+            const data = await response.json();
             
-            // Update win rate
-            const winRate = status.performance.winRate * 100;
-            document.getElementById('live-winrate').textContent = `${winRate.toFixed(1)}%`;
-            
-            // Update evolution
-            this.statusData.bot.evolution++;
-            document.getElementById('live-evolution').textContent = this.statusData.bot.evolution;
-            
-            // Update version based on evolution
-            if (this.statusData.bot.evolution % 100 === 0) {
-                const version = `V${Math.floor(this.statusData.bot.evolution / 100) + 1}`;
-                document.getElementById('live-version').textContent = version;
+            if (data && data.bot) {
+                // Update with REAL backend data
+                document.getElementById('live-capital').textContent = `$${data.bot.balance.toFixed(2)}`;
+                document.getElementById('live-trades').textContent = data.bot.totalTrades || 0;
+                document.getElementById('live-winrate').textContent = `${data.bot.winRate || 0}%`;
+                
+                // Calculate P&L from starting balance
+                const pnl = data.bot.balance - 3947.83; // Using protected balance as starting point
+                document.getElementById('live-pnl').textContent = `$${pnl.toFixed(2)}`;
+                
+                // Backend is online if we got data
+                document.getElementById('backend-status').innerHTML = 'Online <span class="live-indicator"></span>';
+                document.getElementById('backend-status').className = 'status-value positive';
             }
-        } else {
-            // Simulate if not connected
-            this.simulateBotStatus();
+        } catch (error) {
+            console.error('Backend fetch error:', error);
+            // Don't simulate, show actual error
+            document.getElementById('backend-status').innerHTML = 'Connection Error <span class="live-indicator error"></span>';
+            document.getElementById('backend-status').className = 'status-value negative';
         }
     }
 
+    async fetchFromBackend() {
+        try {
+            const response = await fetch('https://auraquant-backend.onrender.com/api/bot/status');
+            const data = await response.json();
+            if (data && data.bot) {
+                document.getElementById('live-capital').textContent = `$${data.bot.balance.toFixed(2)}`;
+                document.getElementById('live-trades').textContent = data.bot.totalTrades;
+                document.getElementById('live-winrate').textContent = `${data.bot.winRate}%`;
+                const pnl = data.bot.balance - 3947.83;
+                document.getElementById('live-pnl').textContent = `$${pnl.toFixed(2)}`;
+            }
+        } catch (error) {
+            console.error('Backend fetch error:', error);
+        }
+    }
+    
     simulateBotStatus() {
         // Simulate trading
         if (Math.random() > 0.7) {
