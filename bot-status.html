@@ -196,6 +196,7 @@
     <div class="header">
         <h1>🤖 AuraQuant Bot Status <span class="live-indicator"></span></h1>
         <p>Real-Time Performance Monitoring - BACKEND CONNECTED</p>
+        <p style="color: #00ff88; font-size: 0.9em;">🔄 Auto-Refresh: Every 3 seconds | Last Update: <span id="last-refresh-time">-</span></p>
         <div id="countdown">Starting in 3...</div>
         <button id="refresh-btn" style="
             background: linear-gradient(135deg, #00ff88, #00ffff);
@@ -422,7 +423,14 @@
             startRealDataFetching() {
                 // Fetch real data from backend
                 this.fetchBotStatus();
-                setInterval(() => this.fetchBotStatus(), 5000); // Refresh every 5 seconds
+                
+                // Auto-refresh every 3 seconds for real-time updates
+                this.refreshInterval = setInterval(() => {
+                    this.fetchBotStatus();
+                    console.log('🔄 Auto-refreshed at', new Date().toLocaleTimeString());
+                }, 3000);
+                
+                // Update evolution counter every second
                 setInterval(() => this.updateEvolution(), 1000);
             }
 
@@ -456,8 +464,11 @@
                         document.getElementById('total-pnl').textContent = `$${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}`;
                         document.getElementById('total-pnl').className = pnl >= 0 ? 'metric-value positive' : 'metric-value negative';
                         
-                        // Update chart
-                        this.updateChart();
+                    // Update chart
+                    this.updateChart();
+                    
+                    // Update last refresh time
+                    document.getElementById('last-refresh-time').textContent = new Date().toLocaleTimeString();
                     }
                     
                     // Also check health endpoint
@@ -716,6 +727,199 @@
             } finally {
                 this.textContent = '🚀 Start Trading';
                 this.disabled = false;
+            }
+        });
+        
+        // Add manual balance button functionality
+        document.getElementById('manual-balance-btn').addEventListener('click', async function() {
+            // Get current balance first
+            let currentBalance = 3947.83;
+            try {
+                const statusResponse = await fetch(`${API_URL}/api/bot/status`);
+                if (statusResponse.ok) {
+                    const statusData = await statusResponse.json();
+                    currentBalance = statusData.bot?.balance || 3947.83;
+                }
+            } catch (e) {
+                console.log('Using last known balance');
+            }
+            
+            // Prompt for new balance
+            const newBalanceStr = prompt(
+                `💰 MANUAL BALANCE CONTROL\n\n` +
+                `Current Balance: $${currentBalance.toFixed(2)}\n\n` +
+                `Enter the new balance amount:\n` +
+                `(This will override the bot's balance permanently)`,
+                currentBalance.toFixed(2)
+            );
+            
+            if (newBalanceStr === null) {
+                return;
+            }
+            
+            const newBalance = parseFloat(newBalanceStr);
+            if (isNaN(newBalance) || newBalance < 0) {
+                alert('❌ Invalid amount. Please enter a valid number.');
+                return;
+            }
+            
+            // Confirm the change
+            const confirmed = confirm(
+                `⚠️ CONFIRM BALANCE CHANGE\n\n` +
+                `Old Balance: $${currentBalance.toFixed(2)}\n` +
+                `New Balance: $${newBalance.toFixed(2)}\n\n` +
+                `This will permanently set the bot balance.\n` +
+                `Are you absolutely sure?`
+            );
+            
+            if (!confirmed) {
+                return;
+            }
+            
+            try {
+                // Send balance update to backend
+                const response = await fetch(`${API_URL}/api/bot/set-balance`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        balance: newBalance,
+                        override: true,
+                        permanent: true,
+                        source: 'manual_control',
+                        previousBalance: currentBalance,
+                        timestamp: new Date().toISOString()
+                    })
+                });
+                
+                if (response.ok) {
+                    alert(`✅ Balance successfully set to $${newBalance.toFixed(2)}`);
+                    
+                    // Update the display immediately
+                    document.getElementById('current-capital').textContent = `$${newBalance.toFixed(2)}`;
+                    window.botMonitor.capital = newBalance;
+                    
+                    // Store locally as backup
+                    localStorage.setItem('forced_balance', newBalance);
+                    localStorage.setItem('balance_set_time', new Date().toISOString());
+                    
+                    // Refresh status after 1 second
+                    setTimeout(() => window.botMonitor.fetchBotStatus(), 1000);
+                } else {
+                    // Store locally even if backend fails
+                    localStorage.setItem('forced_balance', newBalance);
+                    document.getElementById('current-capital').textContent = `$${newBalance.toFixed(2)}`;
+                    window.botMonitor.capital = newBalance;
+                    alert(`⚠️ Balance saved locally: $${newBalance.toFixed(2)}. Will sync with backend.`);
+                }
+            } catch (error) {
+                // Save to local storage as fallback
+                localStorage.setItem('forced_balance', newBalance);
+                document.getElementById('current-capital').textContent = `$${newBalance.toFixed(2)}`;
+                window.botMonitor.capital = newBalance;
+                alert(`💾 Balance saved locally: $${newBalance.toFixed(2)}`);
+            }
+        });
+        
+        // Add reset button functionality
+        document.getElementById('reset-bot-btn').addEventListener('click', async function() {
+            // First confirmation
+            const firstConfirm = confirm(
+                `⚠️ WARNING - BOT RESET\n\n` +
+                `This will reset the bot to its initial state:\n\n` +
+                `• You will choose the reset balance\n` +
+                `• All trade history will be cleared\n` +
+                `• Evolution will restart from Generation 1\n` +
+                `• All learned strategies will be reset\n\n` +
+                `Do you want to continue?`
+            );
+            
+            if (!firstConfirm) {
+                return;
+            }
+            
+            // Ask for reset balance amount
+            const resetAmountStr = prompt(
+                `💰 RESET BALANCE AMOUNT\n\n` +
+                `Enter the balance amount to reset to:\n` +
+                `(Example: 500 for $500, 1000 for $1000, etc.)`,
+                '500'
+            );
+            
+            if (resetAmountStr === null) {
+                return;
+            }
+            
+            const resetAmount = parseFloat(resetAmountStr);
+            if (isNaN(resetAmount) || resetAmount < 0) {
+                alert('❌ Invalid amount. Reset cancelled.');
+                return;
+            }
+            
+            // Second confirmation for safety
+            const secondConfirm = confirm(
+                `🔴 FINAL CONFIRMATION\n\n` +
+                `This will COMPLETELY RESET the bot:\n\n` +
+                `• New Balance: $${resetAmount.toFixed(2)}\n` +
+                `• All trades: CLEARED\n` +
+                `• Evolution: RESET to Gen 1\n` +
+                `• Strategies: DELETED\n\n` +
+                `This action CANNOT be undone!\n\n` +
+                `Are you ABSOLUTELY SURE?`
+            );
+            
+            if (!secondConfirm) {
+                return;
+            }
+            
+            try {
+                // Send reset command to backend with custom amount
+                const response = await fetch(`${API_URL}/api/bot/reset`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'FULL_RESET',
+                        resetBalance: true,
+                        resetTrades: true,
+                        resetEvolution: true,
+                        newBalance: resetAmount,  // Use the custom amount
+                        confirmReset: true,
+                        timestamp: new Date().toISOString()
+                    })
+                });
+                
+                if (response.ok) {
+                    // Clear local storage
+                    localStorage.removeItem('forced_balance');
+                    localStorage.removeItem('pending_balance');
+                    localStorage.removeItem('balance_set_time');
+                    localStorage.removeItem('last_known_balance');
+                    
+                    // Update display immediately
+                    document.getElementById('current-capital').textContent = '$500.00';
+                    document.getElementById('total-trades').textContent = '0';
+                    document.getElementById('win-rate').textContent = '0%';
+                    document.getElementById('total-pnl').textContent = '$0.00';
+                    document.getElementById('evolution-progress').style.width = '1%';
+                    document.getElementById('evolution-progress').textContent = 'Evolution: 1';
+                    document.getElementById('current-version').textContent = 'V1';
+                    
+                    window.botMonitor.capital = 500;
+                    window.botMonitor.evolution = 1;
+                    window.botMonitor.trades = [];
+                    
+                    alert(`✅ BOT RESET COMPLETE!\n\nBalance: $500.00\nEvolution: Generation 1\nStatus: Ready to trade`);
+                    
+                    // Refresh status after 2 seconds
+                    setTimeout(() => window.botMonitor.fetchBotStatus(), 2000);
+                } else {
+                    // Fallback: manually set balance to 500
+                    localStorage.setItem('forced_balance', 500);
+                    document.getElementById('current-capital').textContent = '$500.00';
+                    window.botMonitor.capital = 500;
+                    alert(`⚠️ Reset initiated. You can manually set balance to $500 if needed.`);
+                }
+            } catch (error) {
+                alert(`❌ Reset failed. Use 'Set Balance' to manually set to $500.\nError: ${error.message}`);
             }
         });
         

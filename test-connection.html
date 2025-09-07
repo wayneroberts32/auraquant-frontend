@@ -115,6 +115,7 @@
     <div class="header">
         <h1>🌌 AuraQuant Control Center <span class="live-indicator"></span></h1>
         <p class="subtitle">Direct Backend Connection & Bot Control</p>
+        <p style="color: #00ff88; font-size: 0.9em; margin-top: 10px;">🔄 Auto-Refresh: Every 5 seconds</p>
     </div>
     
     <div class="button-container">
@@ -385,9 +386,28 @@
             }
         }
         
+        // Auto-refresh interval
+        let autoRefreshInterval = null;
+        
+        function startAutoRefresh() {
+            // Auto-refresh every 5 seconds
+            autoRefreshInterval = setInterval(() => {
+                testBotStatus();
+            }, 5000);
+        }
+        
+        function stopAutoRefresh() {
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
+            }
+        }
+        
         // Auto-test on load
         window.onload = () => {
             testBotStatus();
+            startAutoRefresh();
+            console.log('🔄 Auto-refresh enabled (5 seconds)');
         };
     </script>
 </body>
