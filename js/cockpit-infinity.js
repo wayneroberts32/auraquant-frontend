@@ -17,7 +17,17 @@ class CockpitInfinity {
     }
 
     // Initialize the complete Cockpit Infinity dashboard
-    initializeCockpit() {
+    init() {
+        console.log('🚀 Initializing Cockpit Infinity...');
+        this.renderDashboard();
+        this.attachEventListeners();
+        this.startSyntheticActor();
+        this.startInfinityClock();
+        this.loadMarketData();
+        console.log('✅ Cockpit Infinity Ready!');
+    }
+    
+    renderDashboard() {
         const dashboard = `
             <div class="cockpit-infinity">
                 <!-- Cosmic Header with Infinity Symbol -->
@@ -316,7 +326,8 @@ class CockpitInfinity {
             </div>
         `;
 
-        return dashboard;
+        // Don't return, directly insert into DOM
+        document.getElementById('app').innerHTML = dashboard;
     }
 
     // Initialize WebSocket connections
@@ -411,9 +422,10 @@ class CockpitInfinity {
 
     // Initialize the cockpit
     init() {
-        // Initialize dashboard
-        const dashboardHTML = this.initializeCockpit();
-        document.getElementById('app').innerHTML = dashboardHTML;
+        console.log('🚀 Initializing Cockpit Infinity...');
+        
+        // Render the dashboard
+        this.renderDashboard();
         
         // Connect to backend
         this.connectToBackend();
@@ -426,8 +438,16 @@ class CockpitInfinity {
         // Start infinity clock
         this.startInfinityClock();
         
+        // Start synthetic actor
+        this.startSyntheticActor();
+        
+        // Attach event listeners
+        this.attachEventListeners();
+        
         // Add initial commentary
         this.addCommentary('Cockpit Infinity initialized - Synthetic Intelligence online', 'success');
+        
+        console.log('✅ Cockpit Infinity Ready!');
     }
 
     // Start the infinity clock with AWST and world times
@@ -545,6 +565,133 @@ class CockpitInfinity {
     // Calculate profitability
     calculateProfitability() {
         return 0.85; // 85% profitability
+    }
+    
+    // Start synthetic actor
+    startSyntheticActor() {
+        this.synthetic.status = 'ACTIVE';
+        const statusEl = document.getElementById('actorStatus');
+        if (statusEl) statusEl.textContent = 'ACTIVE';
+        console.log('🤖 Synthetic Actor started');
+    }
+    
+    // Attach event listeners
+    attachEventListeners() {
+        // Tab switching
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const tab = e.target.dataset.tab;
+                this.switchTab(tab);
+            });
+        });
+        
+        // Timeframe buttons
+        document.querySelectorAll('.tf-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.tf-btn').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+            });
+        });
+        
+        console.log('📎 Event listeners attached');
+    }
+    
+    // Switch tabs
+    switchTab(tab) {
+        document.querySelectorAll('.tab-content').forEach(content => {
+            content.classList.remove('active');
+        });
+        const targetContent = document.getElementById(tab + 'Trading');
+        if (targetContent) {
+            targetContent.classList.add('active');
+        }
+        
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        document.querySelector(`[data-tab="${tab}"]`).classList.add('active');
+    }
+    
+    // Execute buy order
+    executeBuy() {
+        const price = document.getElementById('buyPrice').value;
+        const amount = document.getElementById('buyAmount').value;
+        const stopLoss = document.getElementById('stopLoss').value;
+        const takeProfit = document.getElementById('takeProfit').value;
+        
+        if (!price || !amount) {
+            alert('Please enter price and amount');
+            return;
+        }
+        
+        const order = {
+            type: 'BUY',
+            symbol: document.getElementById('symbolSelect').value,
+            price: parseFloat(price),
+            amount: parseFloat(amount),
+            stopLoss: stopLoss ? parseFloat(stopLoss) : null,
+            takeProfit: takeProfit ? parseFloat(takeProfit) : null,
+            mode: this.tradingMode
+        };
+        
+        this.addCommentary(`BUY order placed: ${order.amount} @ $${order.price}`, 'success');
+        
+        // Send to backend
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            this.ws.send(JSON.stringify({ action: 'PLACE_ORDER', order }));
+        }
+    }
+    
+    // Execute sell order
+    executeSell() {
+        const price = document.getElementById('sellPrice').value;
+        const amount = document.getElementById('sellAmount').value;
+        const stopLoss = document.getElementById('sellStop').value;
+        const target = document.getElementById('sellTarget').value;
+        
+        if (!price || !amount) {
+            alert('Please enter price and amount');
+            return;
+        }
+        
+        const order = {
+            type: 'SELL',
+            symbol: document.getElementById('symbolSelect').value,
+            price: parseFloat(price),
+            amount: parseFloat(amount),
+            stopLoss: stopLoss ? parseFloat(stopLoss) : null,
+            target: target ? parseFloat(target) : null,
+            mode: this.tradingMode
+        };
+        
+        this.addCommentary(`SELL order placed: ${order.amount} @ $${order.price}`, 'warning');
+        
+        // Send to backend
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            this.ws.send(JSON.stringify({ action: 'PLACE_ORDER', order }));
+        }
+    }
+    
+    // Load market data
+    loadMarketData() {
+        // Placeholder for loading initial market data
+        console.log('📊 Loading market data...');
+    }
+    
+    // Toggle overlay
+    toggleOverlay(type) {
+        const overlayLayer = document.getElementById('overlayLayer');
+        if (!overlayLayer) return;
+        
+        if (this.activeOverlays.includes(type)) {
+            this.activeOverlays = this.activeOverlays.filter(o => o !== type);
+            overlayLayer.classList.remove(type);
+        } else {
+            this.activeOverlays.push(type);
+            overlayLayer.classList.add(type);
+        }
+        
+        this.addCommentary(`Overlay ${type} ${this.activeOverlays.includes(type) ? 'enabled' : 'disabled'}`, 'info');
     }
 }
 
